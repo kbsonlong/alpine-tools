@@ -1,4 +1,4 @@
-FROM alpine:3.14
+FROM alpine:latest
 
 # 设置构建参数
 ARG BUILD_DATE
