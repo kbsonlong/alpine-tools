@@ -1,0 +1,113 @@
+FROM alpine:3
+
+## 设置构建参数
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VCS_URL
+ARG TOOL_VERSION
+ARG SECURITY_HARDENING
+ARG DROP_ROOT
+ARG NON_ROOT_USER
+ARG NON_ROOT_UID
+
+## 添加元数据标签
+LABEL org.label-schema.build-date=$BUILD_DATE \
+      org.label-schema.name="Alpine DevOps Tools" \
+      org.label-schema.description="Alpine Linux based DevOps tools container image" \
+      org.label-schema.version=$TOOL_VERSION \
+      org.label-schema.vcs-ref=$VCS_REF \
+      org.label-schema.vcs-url=$VCS_URL \
+      org.label-schema.vendor="DevOps Team" \
+      org.label-schema.schema-version="1.0"
+
+## 创建非root用户
+RUN if [ "$DROP_ROOT" = "true" ]; then \
+    adduser -D -u $NON_ROOT_UID -s /bin/sh $NON_ROOT_USER; \
+fi
+
+WORKDIR /home/${NON_ROOT_USER}
+
+## 安装基础运维工具组1：网络诊断
+RUN apk add --no-cache \
+    curl \
+    wget \
+    telnet \
+    traceroute \
+    iproute2 \
+    tcpdump \
+    netcat-openbsd \
+    dnsutils \
+    iperf3 \
+    mtr \
+    nmap 
+    
+## 安装基础运维工具组2：系统调试
+RUN apk add --no-cache \
+    grep \
+    vim \
+    jq \
+    procps \
+    lsof \
+    strace \
+    ltrace \
+    sysstat \
+    iotop \
+    dstat 
+    
+## 安装基础运维工具组3：文件和压缩处理
+RUN apk add --no-cache \
+    tar \
+    gzip \
+    bzip2 \
+    xz \
+    zip \
+    unzip \
+    p7zip 
+    
+## 安装基础运维工具组4：监控和日志分析
+RUN apk add --no-cache \
+    syslog-ng \
+    logrotate \
+    prometheus-node-exporter 
+    
+## 安装基础运维工具组5：安全相关
+RUN apk add --no-cache \
+    gpgme \
+    openssl \
+    sudo 
+    
+## 安装基础运维工具组6：云原生支持
+RUN apk add --no-cache \
+    docker-cli \
+    kubernetes-client \
+    helm \
+    etcdctl 
+    
+## 复制入口脚本
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+## 设置安全强化配置
+RUN if [ "$SECURITY_HARDENING" = "true" ]; then \
+    sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config; \
+    rm -rf /root; \
+    mkdir /home/$NON_ROOT_USER; \
+    chown -R $NON_ROOT_USER:$NON_ROOT_USER /home/$NON_ROOT_USER; \
+    echo "$NON_ROOT_USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$NON_ROOT_USER; \
+fi
+
+## 应用资源限制
+RUN echo "* soft nofile 65535" >> /etc/security/limits.conf && \
+    echo "* hard nofile 65535" >> /etc/security/limits.conf
+
+## 设置容器入口点
+ENTRYPOINT ["/entrypoint.sh"]
+
+## 暴露常用端口
+EXPOSE 80 443 22 3000 9090
+
+## 设置默认工作目录
+WORKDIR /workspace
+
+## 切换到非root用户
+USER ${NON_ROOT_USER}:${NON_ROOT_USER}
