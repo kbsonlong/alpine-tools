@@ -41,4 +41,6 @@ RUN apk add --no-cache \
     strace \
     ltrace \
     sysstat \
-    iotop 
+    iotop \
+    bash \
+    tini
